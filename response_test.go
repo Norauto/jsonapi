@@ -37,36 +37,6 @@ func TestMarshalPayload(t *testing.T) {
 	}
 }
 
-func TestMarshalPayloadWithNulls(t *testing.T) {
-
-	books := []*Book{nil, {ID:101}, nil}
-	var jsonData map[string]interface{}
-
-
-	out := bytes.NewBuffer(nil)
-	if err := MarshalPayload(out, books); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := json.Unmarshal(out.Bytes(), &jsonData); err != nil {
-		t.Fatal(err)
-	}
-	raw, ok := jsonData["data"]
-	if !ok {
-		t.Fatalf("data key does not exist")
-	}
-	arr, ok := raw.([]interface{})
-	if !ok {
-		t.Fatalf("data is not an Array")
-	}
-	for i := 0; i < len(arr); i++ {
-		if books[i] == nil && arr[i] != nil ||
-			books[i] != nil && arr[i] == nil {
-			t.Fatalf("restored data is not equal to source")
-		}
-	}
-}
-
 func TestMarshal_attrStringSlice(t *testing.T) {
 	tags := []string{"fiction", "sale"}
 	b := &Book{ID: 1, Tags: tags}
@@ -221,61 +191,6 @@ func TestWithOmitsEmptyAnnotationOnRelation_MixedData(t *testing.T) {
 		t.Fatal("Was expecting the data.relationships.current_post key/value to have NOT been omitted")
 	} else if val.(map[string]interface{})["data"] == nil {
 		t.Fatal("Was expecting the data.relationships.current_post value to have NOT been nil/null")
-	}
-}
-
-func TestWithOmitsEmptyAnnotationOnAttribute(t *testing.T) {
-	type Phone struct {
-		Number string `json:"number"`
-	}
-
-	type Address struct {
-		City   string `json:"city"`
-		Street string `json:"street"`
-	}
-
-	type Tags map[string]int
-
-	type Author struct {
-		ID      int      `jsonapi:"primary,authors"`
-		Name    string   `jsonapi:"attr,title"`
-		Phones  []*Phone `jsonapi:"attr,phones,omitempty"`
-		Address *Address `jsonapi:"attr,address,omitempty"`
-		Tags    Tags     `jsonapi:"attr,tags,omitempty"`
-	}
-
-	author := &Author{
-		ID:      999,
-		Name:    "Igor",
-		Phones:  nil,                        // should be omitted
-		Address: nil,                        // should be omitted
-		Tags:    Tags{"dogs": 1, "cats": 2}, // should not be omitted
-	}
-
-	out := bytes.NewBuffer(nil)
-	if err := MarshalPayload(out, author); err != nil {
-		t.Fatal(err)
-	}
-
-	var jsonData map[string]interface{}
-	if err := json.Unmarshal(out.Bytes(), &jsonData); err != nil {
-		t.Fatal(err)
-	}
-
-	// Verify that there is no field "phones" in attributes
-	payload := jsonData["data"].(map[string]interface{})
-	attributes := payload["attributes"].(map[string]interface{})
-	if _, ok := attributes["title"]; !ok {
-		t.Fatal("Was expecting the data.attributes.title to have NOT been omitted")
-	}
-	if _, ok := attributes["phones"]; ok {
-		t.Fatal("Was expecting the data.attributes.phones to have been omitted")
-	}
-	if _, ok := attributes["address"]; ok {
-		t.Fatal("Was expecting the data.attributes.phones to have been omitted")
-	}
-	if _, ok := attributes["tags"]; !ok {
-		t.Fatal("Was expecting the data.attributes.tags to have NOT been omitted")
 	}
 }
 
@@ -498,6 +413,35 @@ func TestMarshalISO8601Time(t *testing.T) {
 	}
 }
 
+func TestMarshalISO8601TimeWithLocalTimezone(t *testing.T) {
+	loc, _ := time.LoadLocation("Europe/Vienna")
+
+	testModel := &Timestamp{
+		ID:   5,
+		Time: time.Date(2016, 8, 17, 8, 27, 12, 23849, loc),
+	}
+
+	out := bytes.NewBuffer(nil)
+	if err := MarshalPayload(out, testModel); err != nil {
+		t.Fatal(err)
+	}
+
+	resp := new(OnePayload)
+	if err := json.NewDecoder(out).Decode(resp); err != nil {
+		t.Fatal(err)
+	}
+
+	data := resp.Data
+
+	if data.Attributes == nil {
+		t.Fatalf("Expected attributes")
+	}
+
+	if data.Attributes["timestamp"] != "2016-08-17T08:27:12+02:00" {
+		t.Fatal("Timestamp was not serialised into ISO8601 correctly")
+	}
+}
+
 func TestMarshalISO8601TimePointer(t *testing.T) {
 	tm := time.Date(2016, 8, 17, 8, 27, 12, 23849, time.UTC)
 	testModel := &Timestamp{
@@ -522,6 +466,36 @@ func TestMarshalISO8601TimePointer(t *testing.T) {
 	}
 
 	if data.Attributes["next"] != "2016-08-17T08:27:12Z" {
+		t.Fatal("Next was not serialised into ISO8601 correctly")
+	}
+}
+
+func TestMarshalISO8601TimePointerWithLocalTimezone(t *testing.T) {
+	loc, _ := time.LoadLocation("Europe/Vienna")
+
+	tm := time.Date(2016, 8, 17, 8, 27, 12, 23849, loc)
+	testModel := &Timestamp{
+		ID:   5,
+		Next: &tm,
+	}
+
+	out := bytes.NewBuffer(nil)
+	if err := MarshalPayload(out, testModel); err != nil {
+		t.Fatal(err)
+	}
+
+	resp := new(OnePayload)
+	if err := json.NewDecoder(out).Decode(resp); err != nil {
+		t.Fatal(err)
+	}
+
+	data := resp.Data
+
+	if data.Attributes == nil {
+		t.Fatalf("Expected attributes")
+	}
+
+	if data.Attributes["next"] != "2016-08-17T08:27:12+02:00" {
 		t.Fatal("Next was not serialised into ISO8601 correctly")
 	}
 }
