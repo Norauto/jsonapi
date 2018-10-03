@@ -1278,3 +1278,72 @@ func TestUnmarshalNestedStructSlice(t *testing.T) {
 			out.Teams[0].Members[0].Firstname)
 	}
 }
+
+func TestUnmarshalSetValueToNull(t *testing.T) {
+	person := map[string]interface{}{
+		"data": map[string]interface{}{
+			"type": "persons",
+			"id":   "123",
+			"attributes": map[string]interface{}{
+				"name":        nil,
+				"birthdate":   nil,
+				"employee":    nil,
+				"employeePtr": nil,
+				"teams":       nil,
+			},
+			"relationships": map[string]interface{}{
+				"company": nil,
+				"formerCompany": map[string]interface{}{
+					"data": map[string]interface{}{
+						"type": "companies",
+						"id":   nil,
+					},
+				},
+			},
+		},
+	}
+
+	data, err := json.Marshal(person)
+	if err != nil {
+		t.Fatal(err)
+	}
+	in := bytes.NewReader(data)
+
+	date := time.Now()
+	out := &Person{
+		ID:            "123",
+		Name:          "Dupont",
+		Birthdate:     &date,
+		Employee:      Employee{Firstname: "John"},
+		EmployeePtr:   &Employee{Age: 35},
+		Teams:         []Team{{Name: "Team1"}},
+		Company:       &Company{ID: "Norauto"},
+		FormerCompany: &Company{ID: "Midas"},
+	}
+
+	if err := UnmarshalPayload(in, out); err != nil {
+		t.Fatal(err)
+	}
+
+	if out.Name != "" {
+		t.Fatal("Name should be empty string")
+	}
+	if out.Birthdate != nil {
+		t.Fatal("Birthdate should be nil")
+	}
+	if out.Employee.Firstname != "" {
+		t.Fatal("Employee should be empty string")
+	}
+	if out.EmployeePtr != nil {
+		t.Fatal("EmployeePtr should be nil")
+	}
+	if out.Teams != nil {
+		t.Fatal("Teams should be nil")
+	}
+	if out.Company != nil {
+		t.Fatal("Company should be nil")
+	}
+	if out.FormerCompany.ID != "" {
+		t.Fatal("FormerCompany should be empty string")
+	}
+}
