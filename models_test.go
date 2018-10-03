@@ -176,3 +176,14 @@ type Employee struct {
 	Age       int        `json:"age"`
 	HiredAt   *time.Time `json:"hired-at,iso8601"`
 }
+
+type Person struct {
+	ID            string     `jsonapi:"primary,persons"`
+	Name          string     `jsonapi:"attr,name"`
+	Birthdate     *time.Time `jsonapi:"attr,birthdate"`
+	Employee      Employee   `jsonapi:"attr,employee"`
+	EmployeePtr   *Employee  `jsonapi:"attr,employeePtr"`
+	Teams         []Team     `jsonapi:"attr,teams"`
+	Company       *Company   `jsonapi:"relation,company"`
+	FormerCompany *Company   `jsonapi:"relation,formerCompany"`
+}

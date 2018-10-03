@@ -270,10 +270,10 @@ func unmarshalNode(data *Node, model reflect.Value, included *map[string]*Node) 
 				continue
 			}
 
-			attribute := attributes[args[1]]
+			attribute, isPresent := attributes[args[1]]
 
 			// continue if the attribute was not included in the request
-			if attribute == nil {
+			if !isPresent {
 				continue
 			}
 
@@ -290,11 +290,19 @@ func unmarshalNode(data *Node, model reflect.Value, included *map[string]*Node) 
 		} else if annotation == annotationRelation {
 			isSlice := fieldValue.Type().Kind() == reflect.Slice
 
-			if data.Relationships == nil || data.Relationships[args[1]] == nil {
+			if data.Relationships == nil {
 				continue
 			}
 
-			if isSlice {
+			relationshipValue, isPresent := data.Relationships[args[1]]
+			if !isPresent {
+				continue
+			}
+
+			if relationshipValue == nil {
+				zeroValue := reflect.Zero(fieldValue.Type())
+				fieldValue.Set(zeroValue)
+			} else if isSlice {
 				// to-many relationship
 				relationship := new(RelationshipManyNode)
 
@@ -392,6 +400,11 @@ func unmarshalAttribute(
 	fieldValue reflect.Value) (value reflect.Value, err error) {
 	value = reflect.ValueOf(attribute)
 	fieldType := structField.Type
+
+	if attribute == nil {
+		value = reflect.Zero(fieldValue.Type())
+		return
+	}
 
 	// Handle field of type []string
 	if fieldValue.Type() == reflect.TypeOf([]string{}) {
