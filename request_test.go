@@ -1307,7 +1307,6 @@ func TestUnmarshalSetValueToNull(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println(string(data))
 	in := bytes.NewReader(data)
 
 	date := time.Now()
