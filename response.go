@@ -122,11 +122,11 @@ func Marshal(models interface{}, depth int) (Payloader, error) {
 // models interface{} should be either a struct pointer or a slice of struct
 // pointers.
 func MarshalPayloadWithoutIncluded(w io.Writer, model interface{}) error {
-	payload, err := Marshal(model, 0)
+	payload, err := Marshal(model, NoIncluded)
 	if err != nil {
 		return err
 	}
-	// payload.clearIncluded()
+	payload.clearIncluded()
 
 	if err := json.NewEncoder(w).Encode(payload); err != nil {
 		return err
@@ -189,6 +189,7 @@ func marshalMany(models []interface{}, depth int) (*ManyPayload, error) {
 // model interface{} should be a pointer to a struct.
 func MarshalOnePayloadEmbedded(w io.Writer, model interface{}, depth int) error {
 	rootNode, err := visitModelNode(model, nil, false, 1, depth)
+
 	if err != nil {
 		return err
 	}
@@ -400,7 +401,7 @@ func visitModelNode(model interface{}, included *map[string]*Node,
 				if sideload {
 					shallowNodes := []*Node{}
 					for _, n := range relationship.Data {
-						if currentDepth <= depth || depth == -1 {
+						if currentDepth <= depth || depth == InfiniteIncluded {
 							appendIncluded(included, n)
 						}
 						shallowNodes = append(shallowNodes, toShallowNode(n))
@@ -436,7 +437,7 @@ func visitModelNode(model interface{}, included *map[string]*Node,
 				}
 
 				if sideload {
-					if currentDepth <= depth || depth == -1 {
+					if currentDepth <= depth || depth == InfiniteIncluded {
 						appendIncluded(included, relationship)
 					}
 					node.Relationships[args[1]] = &RelationshipOneNode{

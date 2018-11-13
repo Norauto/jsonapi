@@ -50,4 +50,13 @@ const (
 	// QueryParamPageCursor is a JSON API query parameter used with a cursor-based
 	// strategy
 	QueryParamPageCursor = "page[cursor]"
+
+	// InfiniteIncluded represents infinite level when including nested structures
+	InfiniteIncluded = -1
+
+	// NoIncluded represents no included nested structures level in included
+	NoIncluded = 0
+
+	// OneIncluded represents one level of nested structure in included
+	OneIncluded = 1
 )
