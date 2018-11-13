@@ -280,6 +280,13 @@ func CreateBlogs(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
+### Include
+
+If you need to include nested structures into the response, you can pass a depth parameter used to determine the levels of nested structure that will be returned.
+
+With a depth parameter of 0, you won't include nested structures.
+With a depth parameter of n, you'll include n level of nested structures.
+With a depth parameter of -1, you'll include as many nested structures as possible.
 
 ### Links
 
@@ -427,7 +434,7 @@ if err := validate(&myStructToValidate); err != nil {
 ### `MarshalOnePayloadEmbedded`
 
 ```go
-MarshalOnePayloadEmbedded(w io.Writer, model interface{}) error
+MarshalOnePayloadEmbedded(w io.Writer, model interface{}, depth int) error
 ```
 
 Visit [godoc](http://godoc.org/github.com/google/jsonapi#MarshalOnePayloadEmbedded)
@@ -450,7 +457,7 @@ be produced by the client.  This method aims to enable that.
 out := bytes.NewBuffer(nil)
 
 // testModel returns a pointer to a Blog
-jsonapi.MarshalOnePayloadEmbedded(out, testModel())
+jsonapi.MarshalOnePayloadEmbedded(out, testModel(), 1)
 
 h := new(BlogsHandler)
 

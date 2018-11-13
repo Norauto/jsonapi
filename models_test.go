@@ -78,6 +78,11 @@ type Blog struct {
 	ViewCount     int       `jsonapi:"attr,view_count"`
 }
 
+type ExampleNode struct {
+	ID     string         `jsonapi:"primary,root"`
+	Childs []*ExampleNode `jsonapi:"relation,nested" validate:"-"`
+}
+
 func (b *Blog) JSONAPILinks() *Links {
 	return &Links{
 		"self": fmt.Sprintf("https://example.com/api/blogs/%d", b.ID),

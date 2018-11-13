@@ -60,9 +60,9 @@ func (r *Runtime) UnmarshalManyPayload(reader io.Reader, kind reflect.Type) (ele
 	return
 }
 
-func (r *Runtime) MarshalPayload(w io.Writer, model interface{}) error {
+func (r *Runtime) MarshalPayload(w io.Writer, model interface{}, limit int) error {
 	return r.instrumentCall(MarshalStart, MarshalStop, func() error {
-		return MarshalPayload(w, model)
+		return MarshalPayload(w, model, limit)
 	})
 }
 

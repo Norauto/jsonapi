@@ -596,7 +596,7 @@ func TestUnmarshalRelationshipsSerializedEmbedded(t *testing.T) {
 
 func TestUnmarshalNestedRelationshipsEmbedded(t *testing.T) {
 	out := bytes.NewBuffer(nil)
-	if err := MarshalOnePayloadEmbedded(out, testModel()); err != nil {
+	if err := MarshalOnePayloadEmbedded(out, testModel(), 0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1048,14 +1048,14 @@ func samplePayloadWithSideloaded() io.Reader {
 	testModel := testModel()
 
 	out := bytes.NewBuffer(nil)
-	MarshalPayload(out, testModel)
+	MarshalPayload(out, testModel, 1)
 
 	return out
 }
 
 func sampleSerializedEmbeddedTestModel() *Blog {
 	out := bytes.NewBuffer(nil)
-	MarshalOnePayloadEmbedded(out, testModel())
+	MarshalOnePayloadEmbedded(out, testModel(), 0)
 
 	blog := new(Blog)
 	UnmarshalPayload(out, blog)

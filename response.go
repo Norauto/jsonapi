@@ -62,8 +62,8 @@ var (
 //		 }
 //	 }
 //
-func MarshalPayload(w io.Writer, models interface{}) error {
-	payload, err := Marshal(models)
+func MarshalPayload(w io.Writer, models interface{}, depth int) error {
+	payload, err := Marshal(models, depth)
 	if err != nil {
 		return err
 	}
@@ -77,7 +77,7 @@ func MarshalPayload(w io.Writer, models interface{}) error {
 // Marshal does the same as MarshalPayload except it just returns the payload
 // and doesn't write out results. Useful if you use your own JSON rendering
 // library.
-func Marshal(models interface{}) (Payloader, error) {
+func Marshal(models interface{}, depth int) (Payloader, error) {
 	switch vals := reflect.ValueOf(models); vals.Kind() {
 	case reflect.Slice:
 		m, err := convertToSliceInterface(&models)
@@ -85,7 +85,7 @@ func Marshal(models interface{}) (Payloader, error) {
 			return nil, err
 		}
 
-		payload, err := marshalMany(m)
+		payload, err := marshalMany(m, depth)
 		if err != nil {
 			return nil, err
 		}
@@ -108,7 +108,7 @@ func Marshal(models interface{}) (Payloader, error) {
 		if reflect.Indirect(vals).Kind() != reflect.Struct {
 			return nil, ErrUnexpectedType
 		}
-		return marshalOne(models)
+		return marshalOne(models, depth)
 	default:
 		return nil, ErrUnexpectedType
 	}
@@ -122,11 +122,11 @@ func Marshal(models interface{}) (Payloader, error) {
 // models interface{} should be either a struct pointer or a slice of struct
 // pointers.
 func MarshalPayloadWithoutIncluded(w io.Writer, model interface{}) error {
-	payload, err := Marshal(model)
+	payload, err := Marshal(model, 0)
 	if err != nil {
 		return err
 	}
-	payload.clearIncluded()
+	// payload.clearIncluded()
 
 	if err := json.NewEncoder(w).Encode(payload); err != nil {
 		return err
@@ -137,10 +137,10 @@ func MarshalPayloadWithoutIncluded(w io.Writer, model interface{}) error {
 // marshalOne does the same as MarshalOnePayload except it just returns the
 // payload and doesn't write out results. Useful is you use your JSON rendering
 // library.
-func marshalOne(model interface{}) (*OnePayload, error) {
+func marshalOne(model interface{}, depth int) (*OnePayload, error) {
 	included := make(map[string]*Node)
 
-	rootNode, err := visitModelNode(model, &included, true)
+	rootNode, err := visitModelNode(model, &included, true, 1, depth)
 	if err != nil {
 		return nil, err
 	}
@@ -154,14 +154,14 @@ func marshalOne(model interface{}) (*OnePayload, error) {
 // marshalMany does the same as MarshalManyPayload except it just returns the
 // payload and doesn't write out results. Useful is you use your JSON rendering
 // library.
-func marshalMany(models []interface{}) (*ManyPayload, error) {
+func marshalMany(models []interface{}, depth int) (*ManyPayload, error) {
 	payload := &ManyPayload{
 		Data: []*Node{},
 	}
 	included := map[string]*Node{}
 
 	for _, model := range models {
-		node, err := visitModelNode(model, &included, true)
+		node, err := visitModelNode(model, &included, true, 1, depth)
 		if err != nil {
 			return nil, err
 		}
@@ -187,8 +187,8 @@ func marshalMany(models []interface{}) (*ManyPayload, error) {
 // this method is intended for.
 //
 // model interface{} should be a pointer to a struct.
-func MarshalOnePayloadEmbedded(w io.Writer, model interface{}) error {
-	rootNode, err := visitModelNode(model, nil, false)
+func MarshalOnePayloadEmbedded(w io.Writer, model interface{}, depth int) error {
+	rootNode, err := visitModelNode(model, nil, false, 1, depth)
 	if err != nil {
 		return err
 	}
@@ -203,7 +203,7 @@ func MarshalOnePayloadEmbedded(w io.Writer, model interface{}) error {
 }
 
 func visitModelNode(model interface{}, included *map[string]*Node,
-	sideload bool) (*Node, error) {
+	sideload bool, currentDepth, depth int) (*Node, error) {
 	node := new(Node)
 
 	var er error
@@ -387,6 +387,8 @@ func visitModelNode(model interface{}, included *map[string]*Node,
 					fieldValue,
 					included,
 					sideload,
+					currentDepth,
+					depth,
 				)
 				if err != nil {
 					er = err
@@ -398,7 +400,9 @@ func visitModelNode(model interface{}, included *map[string]*Node,
 				if sideload {
 					shallowNodes := []*Node{}
 					for _, n := range relationship.Data {
-						appendIncluded(included, n)
+						if currentDepth <= depth || depth == -1 {
+							appendIncluded(included, n)
+						}
 						shallowNodes = append(shallowNodes, toShallowNode(n))
 					}
 
@@ -423,6 +427,8 @@ func visitModelNode(model interface{}, included *map[string]*Node,
 					fieldValue.Interface(),
 					included,
 					sideload,
+					currentDepth,
+					depth,
 				)
 				if err != nil {
 					er = err
@@ -430,7 +436,9 @@ func visitModelNode(model interface{}, included *map[string]*Node,
 				}
 
 				if sideload {
-					appendIncluded(included, relationship)
+					if currentDepth <= depth || depth == -1 {
+						appendIncluded(included, relationship)
+					}
 					node.Relationships[args[1]] = &RelationshipOneNode{
 						Data:  toShallowNode(relationship),
 						Links: relLinks,
@@ -470,6 +478,15 @@ func visitModelNode(model interface{}, included *map[string]*Node,
 	return node, nil
 }
 
+func containsString(s string, sa []string) bool {
+	for _, i := range sa {
+		if s == i {
+			return true
+		}
+	}
+	return false
+}
+
 func toShallowNode(node *Node) *Node {
 	return &Node{
 		ID:   node.ID,
@@ -478,13 +495,13 @@ func toShallowNode(node *Node) *Node {
 }
 
 func visitModelNodeRelationships(models reflect.Value, included *map[string]*Node,
-	sideload bool) (*RelationshipManyNode, error) {
+	sideload bool, currentDepth, depth int) (*RelationshipManyNode, error) {
 	nodes := []*Node{}
 
 	for i := 0; i < models.Len(); i++ {
 		n := models.Index(i).Interface()
 
-		node, err := visitModelNode(n, included, sideload)
+		node, err := visitModelNode(n, included, sideload, currentDepth+1, depth)
 		if err != nil {
 			return nil, err
 		}
